@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Program Survival Scorer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh; background: #0f172a; color: #e2e8f0;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    padding: 32px 16px;
+  }
+  .container { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; color: #f8fafc; margin-bottom: 4px; letter-spacing: -0.02em; }
+  .subtitle { font-size: 14px; color: #64748b; margin-bottom: 28px; line-height: 1.5; }
+  .program-input {
+    width: 100%; padding: 10px 14px; margin-bottom: 24px;
+    background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+    color: #f1f5f9; font-size: 15px; outline: none;
+  }
+  .program-input:focus { border-color: #475569; }
+  .factor-card {
+    background: #1e293b; border-radius: 10px; padding: 16px 18px;
+    border: 1px solid #334155; margin-bottom: 16px; transition: border-color 0.2s;
+  }
+  .factor-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+  .factor-range {
+    display: flex; justify-content: space-between; font-size: 12px;
+    color: #94a3b8; margin-bottom: 12px; gap: 16px;
+  }
+  .factor-range .fail { color: #ef4444; }
+  .factor-range .win { color: #22c55e; text-align: right; }
+  .score-buttons { display: flex; gap: 8px; justify-content: center; }
+  .score-btn {
+    width: 40px; height: 40px; border-radius: 6px;
+    border: 1px solid #334155; background: #1e293b; color: #f1f5f9;
+    font-size: 15px; font-weight: 400; cursor: pointer; transition: all 0.15s;
+  }
+  .score-btn:hover { border-color: #64748b; }
+  .score-btn.selected { border: 2px solid #e2e8f0; font-weight: 700; }
+  .score-btn.selected.pos { background: #166534; }
+  .score-btn.selected.zero { background: #a16207; }
+  .score-btn.selected.neg { background: #991b1b; }
+
+  .result {
+    margin-top: 28px; background: #1e293b; border-radius: 12px;
+    padding: 24px 20px; text-align: center; border: 2px solid #334155;
+    display: none;
+  }
+  .result.visible { display: block; }
+  .result-label {
+    font-size: 13px; color: #94a3b8; text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: 6px;
+  }
+  .result-score { font-size: 48px; font-weight: 800; line-height: 1; }
+  .result-verdict { font-size: 14px; color: #cbd5e1; margin-top: 10px; }
+
+  .benchmarks { margin-top: 36px; padding-top: 24px; border-top: 1px solid #1e293b; }
+  .benchmarks h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: #94a3b8; }
+  .bench-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .bench-label { width: 110px; font-size: 13px; color: #94a3b8; text-align: right; flex-shrink: 0; }
+  .bench-track { flex: 1; background: #1e293b; border-radius: 4px; height: 22px; position: relative; overflow: hidden; }
+  .bench-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+  .bench-value {
+    position: absolute; right: 8px; top: 2px; font-size: 12px;
+    color: #e2e8f0; font-weight: 600;
+  }
+  .footer {
+    font-size: 11px; color: #475569; margin-top: 28px; text-align: center; line-height: 1.5;
+  }
+  .footer a { color: #64748b; text-decoration: none; }
+  .footer a:hover { color: #94a3b8; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Data Program Survival Scorer</h1>
+  <p class="subtitle">
+    Score a data-sharing or interoperability program against six structural factors.
+    Each factor ranges from −2 (fails) to +2 (succeeds). Total range: −12 to +12.
+  </p>
+
+  <input class="program-input" type="text" id="programName" placeholder="Program name (optional)">
+
+  <div id="factors"></div>
+  <div class="result" id="result">
+    <div class="result-label" id="resultLabel"></div>
+    <div class="result-score" id="resultScore"></div>
+    <div class="result-verdict" id="resultVerdict"></div>
+  </div>
+
+  <div class="benchmarks">
+    <h2>Benchmarks</h2>
+    <div id="benchmarks"></div>
+  </div>
+
+  <p class="footer">
+    Six-factor rubric by Inguva Sivaram ·
+    <a href="https://github.com/sivaraminguva-byte/data-program-survival">github.com/sivaraminguva-byte/data-program-survival</a>
+  </p>
+</div>
+
+<script>
+const FACTORS = [
+  { id: "adoption", name: "Adoption Cost", fail: "High friction, requires new infrastructure", win: "Opt-in, minimal new infrastructure" },
+  { id: "governance", name: "Governance Model", fail: "Centralized, single-agency control", win: "Distributed, community/consortium governance" },
+  { id: "commercial", name: "Commercial Compatibility", fail: "Competes with commercial tooling", win: "Complements existing tools" },
+  { id: "funding", name: "Funding Sustainability", fail: "Entirely grant-dependent", win: "Membership, fee, or embedded model" },
+  { id: "scope", name: "Scope Discipline", fail: "Comprehensive platform doing everything", win: "Narrow, well-defined standard" },
+  { id: "ownership", name: "Ownership Structure", fail: "Owned by single agency or vendor", win: "Owned by the community that uses it" },
+];
+
+const BENCHMARKS = [
+  { name: "caBIG", total: -11 },
+  { name: "MGI", total: 3 },
+  { name: "Open PHACTS", total: 4 },
+  { name: "OMOP / OHDSI", total: 10 },
+  { name: "GS1 GDSN", total: 11 },
+];
+
+const scores = Array(6).fill(null);
+
+function scoreColor(s) {
+  if (s >= 8) return "#166534";
+  if (s >= 4) return "#15803d";
+  if (s >= 0) return "#a16207";
+  if (s >= -4) return "#c2410c";
+  return "#991b1b";
+}
+
+function verdict(s) {
+  if (s >= 8) return "Strong survivor \u2014 designed for adoption";
+  if (s >= 4) return "Viable but watch the weak factors";
+  if (s >= 0) return "Structural risks \u2014 fix before scaling";
+  if (s >= -4) return "Fragile \u2014 likely grant-dependent or siloed";
+  return "Monument risk \u2014 rethink fundamentals";
+}
+
+function render() {
+  const allScored = scores.every(s => s !== null);
+  const total = allScored ? scores.reduce((a, b) => a + b, 0) : null;
+  const name = document.getElementById("programName").value || "Your Program";
+
+  // Update card borders
+  FACTORS.forEach((f, i) => {
+    const card = document.getElementById("card-" + i);
+    if (scores[i] !== null) {
+      card.style.borderColor = scores[i] >= 1 ? "#166534" : scores[i] === 0 ? "#a16207" : "#991b1b";
+    } else {
+      card.style.borderColor = "#334155";
+    }
+  });
+
+  // Update buttons
+  document.querySelectorAll(".score-btn").forEach(btn => {
+    const fi = parseInt(btn.dataset.factor);
+    const val = parseInt(btn.dataset.value);
+    const selected = scores[fi] === val;
+    btn.classList.toggle("selected", selected);
+    btn.classList.toggle("pos", selected && val >= 1);
+    btn.classList.toggle("zero", selected && val === 0);
+    btn.classList.toggle("neg", selected && val <= -1);
+  });
+
+  // Result
+  const result = document.getElementById("result");
+  if (allScored) {
+    result.classList.add("visible");
+    result.style.borderColor = scoreColor(total);
+    document.getElementById("resultLabel").textContent = name;
+    document.getElementById("resultScore").textContent = (total > 0 ? "+" : "") + total;
+    document.getElementById("resultScore").style.color = scoreColor(total);
+    document.getElementById("resultVerdict").textContent = verdict(total);
+  } else {
+    result.classList.remove("visible");
+  }
+}
+
+// Build factor cards
+const factorsEl = document.getElementById("factors");
+FACTORS.forEach((f, i) => {
+  const card = document.createElement("div");
+  card.className = "factor-card";
+  card.id = "card-" + i;
+  card.innerHTML = `
+    <div class="factor-title">${i + 1}. ${f.name}</div>
+    <div class="factor-range">
+      <span class="fail">\u22122: ${f.fail}</span>
+      <span class="win">+2: ${f.win}</span>
+    </div>
+    <div class="score-buttons">
+      ${[-2, -1, 0, 1, 2].map(v =>
+        `<button class="score-btn" data-factor="${i}" data-value="${v}">${v > 0 ? "+" + v : v}</button>`
+      ).join("")}
+    </div>
+  `;
+  factorsEl.appendChild(card);
+});
+
+// Build benchmarks
+const benchEl = document.getElementById("benchmarks");
+BENCHMARKS.forEach(b => {
+  const pct = ((b.total + 12) / 24) * 100;
+  const row = document.createElement("div");
+  row.className = "bench-row";
+  row.innerHTML = `
+    <span class="bench-label">${b.name}</span>
+    <div class="bench-track">
+      <div class="bench-fill" style="width:${Math.max(pct, 2)}%;background:${scoreColor(b.total)}"></div>
+      <span class="bench-value">${b.total > 0 ? "+" + b.total : b.total}</span>
+    </div>
+  `;
+  benchEl.appendChild(row);
+});
+
+// Events
+document.addEventListener("click", e => {
+  if (e.target.classList.contains("score-btn")) {
+    scores[parseInt(e.target.dataset.factor)] = parseInt(e.target.dataset.value);
+    render();
+  }
+});
+document.getElementById("programName").addEventListener("input", render);
+</script>
+</body>
+</html>
